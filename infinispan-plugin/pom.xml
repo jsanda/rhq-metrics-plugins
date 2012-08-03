@@ -4,51 +4,21 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>org.rhq</groupId>
-    <artifactId>rhq-parent</artifactId>
-    <version>4.5.0-SNAPSHOT</version>
+    <groupId>org.rhq.metrics-plugins</groupId>
+    <artifactId>rhq-metrics-plugins-parent</artifactId>
+    <relativePath>../pom.xml</relativePath>
+    <version>0.1-SNAPSHOT</version>
   </parent>
 
-  <groupId>org.rhq</groupId>
   <artifactId>infinispan-metrics-plugin</artifactId>
-  <version>0.1-SNAPSHOT</version>
 
   <name>Infinispan Metrics Server Plugin</name>
 
   <properties>
-    <rhq.version>4.5.0-SNAPSHOT</rhq.version>
     <infinispan.version>5.2.0.ALPHA2</infinispan.version>
   </properties>
 
   <dependencies>
-    <dependency>
-      <groupId>org.rhq</groupId>
-      <artifactId>rhq-core-domain</artifactId>
-      <version>${rhq.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.rhq</groupId>
-      <artifactId>rhq-core-client-api</artifactId>
-      <version>${rhq.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.rhq</groupId>
-      <artifactId>rhq-enterprise-server</artifactId>
-      <version>${rhq.version}</version>
-      <scope>provided</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.rhq</groupId>
-      <artifactId>test-utils</artifactId>
-      <version>${rhq.version}</version>
-      <scope>test</scope>
-    </dependency>
-  
     <dependency>
       <groupId>org.infinispan</groupId>
       <artifactId>infinispan-core</artifactId>
@@ -143,69 +113,4 @@
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
-
-  <profiles>
-    <profile>
-      <id>single-node</id>
-      <activation>
-        <property>
-          <name>cluster.mode</name>
-          <value>single</value>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>cassandra-maven-plugin</artifactId>
-            <version>1.1.0-1</version>
-            <executions>
-              <execution>
-                <id>start-cassandra</id>
-                <phase>compile</phase>
-                <goals>
-                  <goal>start</goal>
-                </goals>
-                <configuration>
-                  <script>${project.build.outputDirectory/dbsetup.script}</script>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
-    <profile>
-      <id>multi-node</id>
-      <activation>
-        <property>
-          <name>cluster.mode</name>
-          <value>multi</value>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>cassandra-maven-plugin</artifactId>
-            <version>1.1.0-1</version>
-            <executions>
-              <execution>
-                <id>start-cassandra</id>
-                <phase>compile</phase>
-                <goals>
-                  <goal>start-cluster</goal>
-                </goals>
-                <configuration>
-                  <script>${project.build.outputDirectory/dbsetup.script}</script>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
-
 </project>
