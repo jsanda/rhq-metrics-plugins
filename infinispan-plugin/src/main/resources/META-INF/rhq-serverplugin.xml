@@ -5,7 +5,7 @@
     apiVersion="1.0"
     description="Infinispan backed metrics server plugin"
     displayName="Metrics: (Infinispan) Metrics server plugin"
-    name="metrics-cassandra"
+    name="metrics-infinispan"
     package="org.rhq.server.plugins.metrics.infinispan"
     xmlns="urn:xmlns:rhq-serverplugin.metrics"
     xmlns:serverplugin="urn:xmlns:rhq-serverplugin"
