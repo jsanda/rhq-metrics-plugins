@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="cassandra-plugin/src/main/java"/>
+	<classpathentry kind="src" path="cassandra-plugin/src/test/java"/>
+	<classpathentry kind="src" path="infinispan-plugin/src/main/java"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/antlr-3.2.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/apache-cassandra-1.1.0.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/apache-cassandra-clientutil-1.1.0.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/apache-cassandra-thrift-1.1.0.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/avro-1.4.0-fixes.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/avro-1.4.0-sources-fixes.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/commons-cli-1.1.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/commons-codec-1.2.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/commons-lang-2.4.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/compress-lzf-0.8.4.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/concurrentlinkedhashmap-lru-1.2.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/guava-r08.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/high-scale-lib-1.1.2.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/jackson-core-asl-1.9.2.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/jackson-mapper-asl-1.9.2.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/jamm-0.2.5.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/jline-0.9.94.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/json-simple-1.1.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/libthrift-0.7.0.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/log4j-1.2.16.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/metrics-core-2.0.3.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/servlet-api-2.5-20081211.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/slf4j-api-1.6.1.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/slf4j-log4j12-1.6.1.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/snakeyaml-1.6.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/snappy-java-1.0.4.1.jar"/>
+	<classpathentry kind="lib" path="cassandra-plugin/src/main/resources/org/rhq/server/plugins/metrics/cassandra/cassandra-1.1.0/lib/snaptree-0.1.jar"/>
+    <classpathentry exported="true" kind="var" path="M2_REPO/org/infinispan/infinispan-core/5.2.0.ALPHA2/infinispan-core-5.2.0.ALPHA2.jar"/>  
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/rhq"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
