@@ -1,5 +1,6 @@
 package org.rhq.server.plugins.metrics.infinispan;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -30,15 +31,15 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     @Override
     public void initialize(ServerPluginContext serverPluginContext) throws Exception {
-        EmbeddedCacheManager cacheManager = new DefaultCacheManager(
-            GlobalConfigurationBuilder.defaultClusteredBuilder()
-                .transport().addProperty("configurationFile", "jgroups.xml")
-                .build(),
-            new ConfigurationBuilder()
-                .clustering()
-                .cacheMode(CacheMode.DIST_SYNC)
-                .hash().numOwners(2)
-                .build());
+        EmbeddedCacheManager cacheManager = new DefaultCacheManager(GlobalConfigurationBuilder
+            .defaultClusteredBuilder().transport().addProperty("configurationFile", "jgroups.xml").build(),
+            new ConfigurationBuilder().clustering().cacheMode(CacheMode.DIST_SYNC).hash().numOwners(2).build());
+
+        // possible dummy code to get the plugin to do something
+        /*
+        Cache c = cacheManager.getCache();
+        c.put("TestKey", new Integer(1));
+        */
     }
 
     @Override
@@ -70,21 +71,35 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     }
 
     @Override
-    public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject, EntityContext entityContext,
-                                                                           MeasurementSchedule measurementSchedule,
-                                                                           long l, long l1) {
-        return null;
+    public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject,
+        EntityContext entityContext, MeasurementSchedule measurementSchedule, long l, long l1) {
+
+        List<MeasurementDataNumericHighLowComposite> result = Collections.emptyList();
+
+        // possible dummy code to get the plugin to do something
+        /*
+        Cache<String, Integer> c = new DefaultCacheManager().getCache();
+        Integer v = c.get("testKey");
+        List<MeasurementDataNumericHighLowComposite> result = new ArrayList<MeasurementDataNumericHighLowComposite>();
+        for (long i = 0, time = System.currentTimeMillis(); i < 60; ++i, time -= 60000L) {
+            result.add(new MeasurementDataNumericHighLowComposite(time, v, v, v));
+        }
+        */
+
+        return result;
     }
 
     @Override
     public List<MeasurementDataNumeric> findRawData(Subject subject, int i, long l, long l1) {
-        return null;
+
+        return Collections.emptyList();
     }
 
     @Override
     public PageList<? extends TraitMeasurement> findTraitsByCriteria(Subject subject,
-                                                                     TraitMeasurementCriteria traitMeasurementCriteria) {
-        return null;
+        TraitMeasurementCriteria traitMeasurementCriteria) {
+
+        return new PageList();
     }
 
 }
