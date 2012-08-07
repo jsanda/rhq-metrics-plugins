@@ -148,7 +148,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
                 }
 
                 rawData.add(new RawData(key.getTimestamp(), rawDataCache.get(key)));
-                rawAggregatesCache.put(aggregatesKey, rawData);
+                rawAggregatesCache.put(aggregatesKey    , rawData);
             }
 
             return null;

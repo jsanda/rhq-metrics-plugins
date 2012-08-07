@@ -1,0 +1,93 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.rhq.metrics-plugins</groupId>
+    <artifactId>rhq-metrics-plugins-parent</artifactId>
+    <relativePath>../pom.xml</relativePath>
+    <version>0.1-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>rhq-metrics-plugins-perf-tests</artifactId>
+
+  <name>RHQ Metrics Server Plugins Performance Tests</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>infinispan-metrics-plugin</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>cassandra-metrics-plugin</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>joda-time</groupId>
+      <artifactId>joda-time</artifactId>
+      <version>2.1</version>
+    </dependency>
+  </dependencies>
+
+  <profiles>
+    <profile>
+      <id>cassandra</id>
+      <activation>
+        <property>
+          <name>metrics.plugin</name>
+          <value>cassandra</value>
+        </property>
+      </activation>
+
+      <properties>
+        <cassandra.cluster.size>1</cassandra.cluster.size>
+      </properties>
+
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>cassandra-maven-plugin</artifactId>
+            <version>1.1.0-1</version>
+            <executions>
+              <execution>
+                <id>start-cassandra</id>
+                <phase>test-compile</phase>
+                <goals>
+                  <goal>start-cluster</goal>
+                </goals>
+                <configuration>
+                  <clusterSize>${cassandra.cluster.size}</clusterSize>
+                  <script>${project.build.outputDirectory/dbsetup.script}</script>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>2.11</version>
+            <configuration>
+              <systemProperties>
+                <property>
+                  <name>plugin.component</name>
+                  <value>org.rhq.server.plugins.metrics.cassandra.CassandraMetricsPluginComponent</value>
+                </property>
+                <property>
+                  <name>plugin.component.test.delegate</name>
+                  <value>org.rhq.server.plugins.metrics.cassandra.CassandraMetricsTestDelegate</value>
+                </property>
+              </systemProperties>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+
+</project>
