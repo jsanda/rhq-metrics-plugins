@@ -1,14 +1,17 @@
 package org.rhq.server.plugins.metrics.infinispan;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.infinispan.configuration.cache.CacheMode;
-import org.infinispan.configuration.cache.ConfigurationBuilder;
-import org.infinispan.configuration.global.GlobalConfigurationBuilder;
+import org.infinispan.Cache;
+import org.infinispan.distexec.DefaultExecutorService;
+import org.infinispan.distexec.DistributedCallable;
+import org.infinispan.distexec.DistributedExecutorService;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
+import org.joda.time.DateTime;
 
 import org.rhq.core.domain.auth.Subject;
 import org.rhq.core.domain.common.EntityContext;
@@ -29,11 +32,15 @@ import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginFacet;
  */
 public class InfinispanMetricsPluginComponent implements MetricsServerPluginFacet, ServerPluginComponent {
 
+    public static final String RAW_DATA_CACHE = "RawData";
+
+    public static final String RAW_AGGREGATES_CACHE = "RawAggregates";
+
+    private EmbeddedCacheManager cacheManager;
+
     @Override
     public void initialize(ServerPluginContext serverPluginContext) throws Exception {
-        EmbeddedCacheManager cacheManager = new DefaultCacheManager(GlobalConfigurationBuilder
-            .defaultClusteredBuilder().transport().addProperty("configurationFile", "jgroups.xml").build(),
-            new ConfigurationBuilder().clustering().cacheMode(CacheMode.DIST_SYNC).hash().numOwners(2).build());
+        cacheManager = new DefaultCacheManager("infinispan.xml", true);
 
         // possible dummy code to get the plugin to do something
         /*
@@ -55,7 +62,16 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     }
 
     @Override
-    public void addNumericData(Set<MeasurementDataNumeric> measurementDataNumerics) {
+    public void addNumericData(Set<MeasurementDataNumeric> dataSet) {
+        Cache<String, Double> cache = cacheManager.getCache(RAW_DATA_CACHE, true);
+        DistributedExecutorService executorService = new DefaultExecutorService(cache);
+
+        for (MeasurementDataNumeric data : dataSet) {
+            String key = data.getScheduleId() + ":" + data.getTimestamp();
+            cache.put(key, data.getValue());
+            executorService.submit(new AggregateRawData(), key);
+        }
+
     }
 
     @Override
@@ -100,6 +116,47 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         TraitMeasurementCriteria traitMeasurementCriteria) {
 
         return new PageList();
+    }
+
+    EmbeddedCacheManager getCacheManager() {
+        return cacheManager;
+    }
+
+    private class AggregateRawData implements DistributedCallable<String, Double, String> {
+
+        private Cache<String, Double> rawDataCache;
+
+        private Set<String> keys;
+
+        @Override
+        public void setEnvironment(Cache<String, Double> cache, Set<String> inputKeys) {
+            rawDataCache = cache;
+            keys = inputKeys;
+        }
+
+        @Override
+        public String call() throws Exception {
+            Cache<String, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+            for (String key : keys) {
+                String[] keyParts = key.split(":");
+                String scheduleId = keyParts[0];
+                long timestamp = Long.parseLong(keyParts[1]);
+                long theHour = new DateTime(timestamp).hourOfDay().roundFloorCopy().getMillis();
+
+                String aggregatesKey = scheduleId + ":" + theHour;
+                Set<RawData> rawData = rawAggregatesCache.get(aggregatesKey);
+
+                if (rawData == null) {
+                    rawData = new HashSet<RawData>();
+                }
+
+                rawData.add(new RawData(timestamp, rawDataCache.get(scheduleId + ":" + timestamp)));
+                rawAggregatesCache.put(scheduleId + ":" + theHour, rawData);
+            }
+
+            return null;
+        }
+
     }
 
 }
