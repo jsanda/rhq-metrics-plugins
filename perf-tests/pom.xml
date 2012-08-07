@@ -63,7 +63,7 @@
                 </goals>
                 <configuration>
                   <clusterSize>${cassandra.cluster.size}</clusterSize>
-                  <script>${project.build.outputDirectory/dbsetup.script}</script>
+                  <script>${project.basedir}/../cassandra-plugin/target/classes/dbsetup.script</script>
                 </configuration>
               </execution>
             </executions>
@@ -81,6 +81,37 @@
                 <property>
                   <name>plugin.component.test.delegate</name>
                   <value>org.rhq.server.plugins.metrics.cassandra.CassandraMetricsTestDelegate</value>
+                </property>
+              </systemProperties>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>infinispan</id>
+      <activation>
+        <property>
+          <name>metrics.plugin</name>
+          <value>infinispan</value>
+        </property>
+      </activation>
+
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>2.11</version>
+            <configuration>
+              <systemProperties>
+                <property>
+                  <name>plugin.component</name>
+                  <value>org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent</value>
+                </property>
+                <property>
+                  <name>plugin.component.test.delegate</name>
+                  <value>org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsTestDelegate</value>
                 </property>
               </systemProperties>
             </configuration>

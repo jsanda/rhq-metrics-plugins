@@ -3,6 +3,8 @@ package org.rhq.server.plugins.metrics.infinispan;
 import java.util.List;
 
 import org.rhq.core.domain.auth.Subject;
+import org.rhq.core.domain.configuration.Configuration;
+import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 import org.rhq.enterprise.server.plugin.pc.metrics.AggregateTestData;
 import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginTestDelegate;
 
@@ -10,6 +12,11 @@ import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginTestDelega
  * @author John Sanda
  */
 public class InfinispanMetricsTestDelegate implements MetricsServerPluginTestDelegate {
+
+    @Override
+    public ServerPluginContext createTestContext() {
+        return new ServerPluginContext(null, null, null, new Configuration(), null);
+    }
 
     @Override
     public void purgeRawData() {
