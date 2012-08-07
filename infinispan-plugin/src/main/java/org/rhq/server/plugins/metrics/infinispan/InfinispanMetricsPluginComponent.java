@@ -63,11 +63,11 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     @Override
     public void addNumericData(Set<MeasurementDataNumeric> dataSet) {
-        Cache<String, Double> cache = cacheManager.getCache(RAW_DATA_CACHE, true);
+        Cache<MetricKey, Double> cache = cacheManager.getCache(RAW_DATA_CACHE, true);
         DistributedExecutorService executorService = new DefaultExecutorService(cache);
 
         for (MeasurementDataNumeric data : dataSet) {
-            String key = data.getScheduleId() + ":" + data.getTimestamp();
+            MetricKey key = new MetricKey(data.getScheduleId(), data.getTimestamp());
             cache.put(key, data.getValue());
             executorService.submit(new AggregateRawData(), key);
         }
@@ -122,36 +122,33 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         return cacheManager;
     }
 
-    private class AggregateRawData implements DistributedCallable<String, Double, String> {
+    private class AggregateRawData implements DistributedCallable<MetricKey, Double, String> {
 
-        private Cache<String, Double> rawDataCache;
+        private Cache<MetricKey, Double> rawDataCache;
 
-        private Set<String> keys;
+        private Set<MetricKey> keys;
 
         @Override
-        public void setEnvironment(Cache<String, Double> cache, Set<String> inputKeys) {
+        public void setEnvironment(Cache<MetricKey, Double> cache, Set<MetricKey> inputKeys) {
             rawDataCache = cache;
             keys = inputKeys;
         }
 
         @Override
         public String call() throws Exception {
-            Cache<String, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
-            for (String key : keys) {
-                String[] keyParts = key.split(":");
-                String scheduleId = keyParts[0];
-                long timestamp = Long.parseLong(keyParts[1]);
-                long theHour = new DateTime(timestamp).hourOfDay().roundFloorCopy().getMillis();
+            Cache<MetricKey, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+            for (MetricKey key : keys) {
+                long theHour = new DateTime(key.getTimestamp()).hourOfDay().roundFloorCopy().getMillis();
 
-                String aggregatesKey = scheduleId + ":" + theHour;
+                MetricKey aggregatesKey = new MetricKey(key.getScheduleId(), theHour);
                 Set<RawData> rawData = rawAggregatesCache.get(aggregatesKey);
 
                 if (rawData == null) {
                     rawData = new HashSet<RawData>();
                 }
 
-                rawData.add(new RawData(timestamp, rawDataCache.get(scheduleId + ":" + timestamp)));
-                rawAggregatesCache.put(scheduleId + ":" + theHour, rawData);
+                rawData.add(new RawData(key.getTimestamp(), rawDataCache.get(key)));
+                rawAggregatesCache.put(aggregatesKey, rawData);
             }
 
             return null;

@@ -71,14 +71,17 @@ public class InfinispanMetricsPluginComponentTest {
 
         // verify that raw data inserted into raw data cache
         EmbeddedCacheManager cacheManager = metricsServer.getCacheManager();
-        Cache<String, Double> rawDataCache = cacheManager.getCache(RAW_DATA_CACHE);
+        Cache<MetricKey, Double> rawDataCache = cacheManager.getCache(RAW_DATA_CACHE);
 
-        assertEquals(rawDataCache.get(scheduleId + ":" + threeMinutesAgo.getMillis()), 3.2, "Failed to store raw data");
-        assertEquals(rawDataCache.get(scheduleId + ":" + twoMinutesAgo.getMillis()), 3.9, "Failed to store raw data");
-        assertEquals(rawDataCache.get(scheduleId + ":" + oneMinuteAgo.getMillis()), 2.6, "Failed to store raw data");
+        assertEquals(rawDataCache.get(new MetricKey(scheduleId, threeMinutesAgo.getMillis())), 3.2,
+            "Failed to store raw data");
+        assertEquals(rawDataCache.get(new MetricKey(scheduleId, twoMinutesAgo.getMillis())), 3.9,
+            "Failed to store raw data");
+        assertEquals(rawDataCache.get(new MetricKey(scheduleId, oneMinuteAgo.getMillis())), 2.6,
+            "Failed to store raw data");
 
         // verify that raw aggregates upserted (i.e., inserted or updated)
-        Cache<String, Set<RawData>> rawAggregates = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+        Cache<MetricKey, Set<RawData>> rawAggregates = cacheManager.getCache(RAW_AGGREGATES_CACHE);
 
         Set<RawData> expected = asSet(
             new RawData(threeMinutesAgo.getMillis(), 3.2),
@@ -86,7 +89,7 @@ public class InfinispanMetricsPluginComponentTest {
             new RawData(oneMinuteAgo.getMillis(), 2.6)
         );
 
-        Set<RawData> actual = rawAggregates.get(scheduleId + ":" + hour4.getMillis());
+        Set<RawData> actual = rawAggregates.get(new MetricKey(scheduleId, hour4.getMillis()));
 
         assertRawDataEquals(actual, expected, "Failed to find raw aggregates");
     }
