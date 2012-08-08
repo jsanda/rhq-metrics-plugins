@@ -45,11 +45,12 @@ public class InfinispanMetricsTestDelegate implements MetricsServerPluginTestDel
 
     @Override
     public List<AggregateTestData> find1HourData(Subject subject, int i, long l, long l1) {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return null; //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
     public List<AggregateTestData> find6HourData(Subject subject, int i, long l, long l1) {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return null; //To change body of implemented methods use File | Settings | File Templates.
     }
+
 }

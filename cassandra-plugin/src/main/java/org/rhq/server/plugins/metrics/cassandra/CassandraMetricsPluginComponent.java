@@ -9,6 +9,22 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 
+import me.prettyprint.cassandra.serializers.CompositeSerializer;
+import me.prettyprint.cassandra.serializers.DoubleSerializer;
+import me.prettyprint.cassandra.serializers.IntegerSerializer;
+import me.prettyprint.cassandra.serializers.LongSerializer;
+import me.prettyprint.cassandra.serializers.StringSerializer;
+import me.prettyprint.cassandra.service.ColumnSliceIterator;
+import me.prettyprint.hector.api.Cluster;
+import me.prettyprint.hector.api.Keyspace;
+import me.prettyprint.hector.api.beans.Composite;
+import me.prettyprint.hector.api.beans.HColumn;
+import me.prettyprint.hector.api.ddl.ComparatorType;
+import me.prettyprint.hector.api.factory.HFactory;
+import me.prettyprint.hector.api.mutation.MutationResult;
+import me.prettyprint.hector.api.mutation.Mutator;
+import me.prettyprint.hector.api.query.SliceQuery;
+
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeComparator;
 import org.joda.time.Hours;
@@ -32,22 +48,6 @@ import org.rhq.enterprise.server.plugin.pc.ControlResults;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginComponent;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginFacet;
-
-import me.prettyprint.cassandra.serializers.CompositeSerializer;
-import me.prettyprint.cassandra.serializers.DoubleSerializer;
-import me.prettyprint.cassandra.serializers.IntegerSerializer;
-import me.prettyprint.cassandra.serializers.LongSerializer;
-import me.prettyprint.cassandra.serializers.StringSerializer;
-import me.prettyprint.cassandra.service.ColumnSliceIterator;
-import me.prettyprint.hector.api.Cluster;
-import me.prettyprint.hector.api.Keyspace;
-import me.prettyprint.hector.api.beans.Composite;
-import me.prettyprint.hector.api.beans.HColumn;
-import me.prettyprint.hector.api.ddl.ComparatorType;
-import me.prettyprint.hector.api.factory.HFactory;
-import me.prettyprint.hector.api.mutation.MutationResult;
-import me.prettyprint.hector.api.mutation.Mutator;
-import me.prettyprint.hector.api.query.SliceQuery;
 
 /**
  * @author John Sanda
@@ -110,8 +110,8 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
     }
 
     @Override
-    public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject, EntityContext entityContext,
-        MeasurementSchedule schedule, long beginTime, long endTime) {
+    public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject,
+        EntityContext entityContext, MeasurementSchedule schedule, long beginTime, long endTime) {
         DateTime begin = new DateTime(beginTime);
 
         if (dateTimeService.isInRawDataRange(begin)) {
@@ -131,14 +131,14 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
 
     private List<MeasurementDataNumericHighLowComposite> findRawDataForContext(MeasurementSchedule schedule,
         long beginTime, long endTime) {
-        SliceQuery<Integer, Long, Double> rawDataQuery = HFactory.createSliceQuery(keyspace,
-            IntegerSerializer.get(), LongSerializer.get(), DoubleSerializer.get());
+        SliceQuery<Integer, Long, Double> rawDataQuery = HFactory.createSliceQuery(keyspace, IntegerSerializer.get(),
+            LongSerializer.get(), DoubleSerializer.get());
         rawDataQuery.setColumnFamily(rawMetricsDataCF);
         rawDataQuery.setKey(schedule.getId());
         rawDataQuery.setRange(beginTime, endTime, false, DEFAULT_PAGE_SIZE);
 
-        ColumnSliceIterator<Integer, Long, Double> rawDataIterator =
-            new ColumnSliceIterator<Integer, Long, Double>(rawDataQuery, beginTime, endTime, false);
+        ColumnSliceIterator<Integer, Long, Double> rawDataIterator = new ColumnSliceIterator<Integer, Long, Double>(
+            rawDataQuery, beginTime, endTime, false);
         Buckets buckets = new Buckets(beginTime, endTime);
         HColumn<Long, Double> rawColumn = null;
 
@@ -170,8 +170,8 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
         end.addComponent(endTime, LongSerializer.get(), ComparatorType.LONGTYPE.getTypeName(), LESS_THAN_EQUAL);
         dataQuery.setRange(begin, end, true, DEFAULT_PAGE_SIZE);
 
-        ColumnSliceIterator<Integer, Composite, Double> dataIterator =
-            new ColumnSliceIterator<Integer, Composite, Double>(dataQuery, begin, end, false);
+        ColumnSliceIterator<Integer, Composite, Double> dataIterator = new ColumnSliceIterator<Integer, Composite, Double>(
+            dataQuery, begin, end, false);
         Buckets buckets = new Buckets(beginTime, endTime);
         HColumn<Composite, Double> column = null;
 
@@ -199,8 +199,7 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
     }
 
     @Override
-    public PageList<? extends TraitMeasurement> findTraitsByCriteria(Subject subject,
-        TraitMeasurementCriteria criteria) {
+    public PageList<? extends TraitMeasurement> findTraitsByCriteria(Subject subject, TraitMeasurementCriteria criteria) {
 
         SliceQuery<Integer, Composite, String> query = HFactory.createSliceQuery(keyspace, IntegerSerializer.get(),
             CompositeSerializer.get(), StringSerializer.get());
@@ -230,17 +229,19 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
 
             trait.setDisplayName(columnName.get(4, StringSerializer.get()));
 
+            trait.setName(columnName.get(5, StringSerializer.get()));
+
             traits.add(trait);
         }
 
         return traits;
     }
 
-//    @Override
-//    public void insertMetrics(MeasurementReport measurementReport) {
-//        insertNumericData(measurementReport.getNumericData());
-//        insertTraitData(measurementReport.getTraitData());
-//    }
+    //    @Override
+    //    public void insertMetrics(MeasurementReport measurementReport) {
+    //        insertNumericData(measurementReport.getNumericData());
+    //        insertTraitData(measurementReport.getTraitData());
+    //    }
 
     @Override
     public void addNumericData(Set<MeasurementDataNumeric> dataSet) {
@@ -249,8 +250,11 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
 
         for (MeasurementDataNumeric data : dataSet) {
             updates.put(data.getScheduleId(), new DateTime(data.getTimestamp()).hourOfDay().roundFloorCopy());
-            mutator.addInsertion(data.getScheduleId(), rawMetricsDataCF, HFactory.createColumn(
-                data.getTimestamp(), data.getValue(), DateTimeService.SEVEN_DAYS, LongSerializer.get(), DoubleSerializer.get()));
+            mutator.addInsertion(
+                data.getScheduleId(),
+                rawMetricsDataCF,
+                HFactory.createColumn(data.getTimestamp(), data.getValue(), DateTimeService.SEVEN_DAYS,
+                    LongSerializer.get(), DoubleSerializer.get()));
         }
 
         mutator.execute();
@@ -264,8 +268,11 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
         Mutator<Integer> indexMutator = HFactory.createMutator(keyspace, IntegerSerializer.get());
 
         for (MeasurementDataTrait trait : dataSet) {
-            mutator.addInsertion(trait.getScheduleId(), traitsCF, HFactory.createColumn(trait.getTimestamp(),
-                trait.getValue(), DateTimeService.ONE_YEAR, LongSerializer.get(), StringSerializer.get()));
+            mutator.addInsertion(
+                trait.getScheduleId(),
+                traitsCF,
+                HFactory.createColumn(trait.getTimestamp(), trait.getValue(), DateTimeService.ONE_YEAR,
+                    LongSerializer.get(), StringSerializer.get()));
 
             Composite composite = new Composite();
             composite.addComponent(trait.getTimestamp(), LongSerializer.get());
@@ -274,8 +281,8 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
             composite.addComponent(trait.getDisplayType().ordinal(), IntegerSerializer.get());
             composite.addComponent(trait.getDisplayName(), StringSerializer.get());
 
-            indexMutator.addInsertion(trait.getResourceId(), resourceTraitsCF, HFactory.createColumn(composite,
-                trait.getValue(), CompositeSerializer.get(), StringSerializer.get()));
+            indexMutator.addInsertion(trait.getResourceId(), resourceTraitsCF,
+                HFactory.createColumn(composite, trait.getValue(), CompositeSerializer.get(), StringSerializer.get()));
         }
 
         mutator.execute();
@@ -291,25 +298,24 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
         Map<Integer, DateTime> updatedSchedules = aggregateRawData();
         updateMetricsQueue(sixHourMetricsDataCF, updatedSchedules);
 
-        updatedSchedules = calculateAggregates(oneHourMetricsDataCF, sixHourMetricsDataCF,
-            Minutes.minutes(60 * 6), Hours.hours(24).toStandardMinutes(), DateTimeService.ONE_MONTH);
+        updatedSchedules = calculateAggregates(oneHourMetricsDataCF, sixHourMetricsDataCF, Minutes.minutes(60 * 6),
+            Hours.hours(24).toStandardMinutes(), DateTimeService.ONE_MONTH);
         updateMetricsQueue(twentyFourHourMetricsDataCF, updatedSchedules);
 
-        calculateAggregates(sixHourMetricsDataCF, twentyFourHourMetricsDataCF,
-            Hours.hours(24).toStandardMinutes(), Hours.hours(24).toStandardMinutes(), DateTimeService.ONE_YEAR);
+        calculateAggregates(sixHourMetricsDataCF, twentyFourHourMetricsDataCF, Hours.hours(24).toStandardMinutes(),
+            Hours.hours(24).toStandardMinutes(), DateTimeService.ONE_YEAR);
     }
 
     private Map<Integer, DateTime> aggregateRawData() {
         Map<Integer, DateTime> updatedSchedules = new TreeMap<Integer, DateTime>();
 
-        SliceQuery<String,Composite, Integer> queueQuery = HFactory.createSliceQuery(keyspace,
-            StringSerializer.get(), new CompositeSerializer().get(), IntegerSerializer.get());
+        SliceQuery<String, Composite, Integer> queueQuery = HFactory.createSliceQuery(keyspace, StringSerializer.get(),
+            new CompositeSerializer().get(), IntegerSerializer.get());
         queueQuery.setColumnFamily(metricsQueueCF);
         queueQuery.setKey(oneHourMetricsDataCF);
 
-        ColumnSliceIterator<String, Composite, Integer> queueIterator =
-            new ColumnSliceIterator<String, Composite, Integer>(queueQuery, (Composite) null, (Composite) null,
-                false);
+        ColumnSliceIterator<String, Composite, Integer> queueIterator = new ColumnSliceIterator<String, Composite, Integer>(
+            queueQuery, (Composite) null, (Composite) null, false);
 
         Mutator<Integer> mutator = HFactory.createMutator(keyspace, IntegerSerializer.get());
         Mutator<String> queueMutator = HFactory.createMutator(keyspace, StringSerializer.get());
@@ -326,9 +332,8 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
             rawDataQuery.setColumnFamily(rawMetricsDataCF);
             rawDataQuery.setKey(scheduleId);
 
-            ColumnSliceIterator<Integer, Long, Double> rawDataIterator =
-                new ColumnSliceIterator<Integer, Long, Double>(rawDataQuery, startTime.getMillis(), endTime.getMillis(),
-                    false);
+            ColumnSliceIterator<Integer, Long, Double> rawDataIterator = new ColumnSliceIterator<Integer, Long, Double>(
+                rawDataQuery, startTime.getMillis(), endTime.getMillis(), false);
             rawDataIterator.hasNext();
 
             HColumn<Long, Double> rawDataColumn = rawDataIterator.next();
@@ -350,9 +355,12 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
 
             double avg = sum / count;
 
-            mutator.addInsertion(scheduleId, oneHourMetricsDataCF, createAvgColumn(startTime, avg, DateTimeService.TWO_WEEKS));
-            mutator.addInsertion(scheduleId, oneHourMetricsDataCF, createMaxColumn(startTime, max, DateTimeService.TWO_WEEKS));
-            mutator.addInsertion(scheduleId, oneHourMetricsDataCF, createMinColumn(startTime, min, DateTimeService.TWO_WEEKS));
+            mutator.addInsertion(scheduleId, oneHourMetricsDataCF,
+                createAvgColumn(startTime, avg, DateTimeService.TWO_WEEKS));
+            mutator.addInsertion(scheduleId, oneHourMetricsDataCF,
+                createMaxColumn(startTime, max, DateTimeService.TWO_WEEKS));
+            mutator.addInsertion(scheduleId, oneHourMetricsDataCF,
+                createMinColumn(startTime, min, DateTimeService.TWO_WEEKS));
 
             updatedSchedules.put(scheduleId, dateTimeService.getTimeSlice(startTime, Minutes.minutes(60 * 6)));
 
@@ -365,21 +373,20 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
         return updatedSchedules;
     }
 
-    private Map<Integer, DateTime> calculateAggregates(String fromColumnFamily, String toColumnFamily, Minutes interval,
-        Minutes nextInterval, int ttl) {
+    private Map<Integer, DateTime> calculateAggregates(String fromColumnFamily, String toColumnFamily,
+        Minutes interval, Minutes nextInterval, int ttl) {
         DateTime currentHour = getCurrentHour();
         DateTimeComparator dateTimeComparator = DateTimeComparator.getInstance();
 
         Map<Integer, DateTime> updatedSchedules = new TreeMap<Integer, DateTime>();
 
-        SliceQuery<String,Composite, Integer> queueQuery = HFactory.createSliceQuery(keyspace,
-            StringSerializer.get(), new CompositeSerializer().get(), IntegerSerializer.get());
+        SliceQuery<String, Composite, Integer> queueQuery = HFactory.createSliceQuery(keyspace, StringSerializer.get(),
+            new CompositeSerializer().get(), IntegerSerializer.get());
         queueQuery.setColumnFamily(metricsQueueCF);
         queueQuery.setKey(toColumnFamily);
 
-        ColumnSliceIterator<String, Composite, Integer> queueIterator =
-            new ColumnSliceIterator<String, Composite, Integer>(queueQuery, (Composite) null, (Composite) null,
-                false);
+        ColumnSliceIterator<String, Composite, Integer> queueIterator = new ColumnSliceIterator<String, Composite, Integer>(
+            queueQuery, (Composite) null, (Composite) null, false);
 
         Mutator<Integer> mutator = HFactory.createMutator(keyspace, IntegerSerializer.get());
         Mutator<String> queueMutator = HFactory.createMutator(keyspace, StringSerializer.get());
@@ -406,9 +413,8 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
             fromColumnFamilyQuery.setColumnFamily(fromColumnFamily);
             fromColumnFamilyQuery.setKey(scheduleId);
 
-            ColumnSliceIterator<Integer, Composite, Double> fromColumnFamilyIterator =
-                new ColumnSliceIterator<Integer, Composite, Double>(fromColumnFamilyQuery, startColKey, endColKey,
-                    false);
+            ColumnSliceIterator<Integer, Composite, Double> fromColumnFamilyIterator = new ColumnSliceIterator<Integer, Composite, Double>(
+                fromColumnFamilyQuery, startColKey, endColKey, false);
             fromColumnFamilyIterator.hasNext();
 
             HColumn<Composite, Double> fromColumn = null;
@@ -424,26 +430,26 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
                 AggregateType type = AggregateType.valueOf(fromColumn.getName().get(1, IntegerSerializer.get()));
 
                 switch (type) {
-                    case AVG:
-                        sum += fromColumn.getValue();
-                        avgCount++;
-                        break;
-                    case MIN:
-                        if (minCount == 0) {
-                            min = fromColumn.getValue();
-                        } else if (fromColumn.getValue() < min) {
-                            min = fromColumn.getValue();
-                        }
-                        minCount++;
-                        break;
-                    case MAX:
-                        if (maxCount == 0) {
-                            max = fromColumn.getValue();
-                        } else if (fromColumn.getValue() > max) {
-                            max = fromColumn.getValue();
-                        }
-                        maxCount++;
-                        break;
+                case AVG:
+                    sum += fromColumn.getValue();
+                    avgCount++;
+                    break;
+                case MIN:
+                    if (minCount == 0) {
+                        min = fromColumn.getValue();
+                    } else if (fromColumn.getValue() < min) {
+                        min = fromColumn.getValue();
+                    }
+                    minCount++;
+                    break;
+                case MAX:
+                    if (maxCount == 0) {
+                        max = fromColumn.getValue();
+                    } else if (fromColumn.getValue() > max) {
+                        max = fromColumn.getValue();
+                    }
+                    maxCount++;
+                    break;
                 }
             }
 
@@ -472,8 +478,8 @@ public class CassandraMetricsPluginComponent implements MetricsServerPluginFacet
             Composite composite = new Composite();
             composite.addComponent(collectionTime.getMillis(), LongSerializer.get());
             composite.addComponent(scheduleId, IntegerSerializer.get());
-            HColumn<Composite, Integer> column = HFactory.createColumn(composite, 0,
-                CompositeSerializer.get(), IntegerSerializer.get());
+            HColumn<Composite, Integer> column = HFactory.createColumn(composite, 0, CompositeSerializer.get(),
+                IntegerSerializer.get());
             mutator.addInsertion(columnFamily, metricsQueueCF, column);
         }
 
