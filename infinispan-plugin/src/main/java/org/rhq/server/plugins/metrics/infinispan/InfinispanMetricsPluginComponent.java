@@ -8,12 +8,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import org.infinispan.Cache;
 import org.infinispan.distexec.DefaultExecutorService;
 import org.infinispan.distexec.DistributedCallable;
 import org.infinispan.distexec.DistributedExecutorService;
-import org.infinispan.distexec.mapreduce.MapReduceTask;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.joda.time.DateTime;
@@ -31,8 +32,6 @@ import org.rhq.core.domain.util.PageList;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginComponent;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginFacet;
-import org.rhq.server.plugins.metrics.infinispan.query.DataPointsMapper;
-import org.rhq.server.plugins.metrics.infinispan.query.DataPointsReducer;
 
 /**
  * @author John Sanda
@@ -115,34 +114,57 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
             keys.add(new MetricKey(schedule.getId(), theTime.getMillis()));
             theTime = theTime.plusHours(1);
         }
+//
+//        Buckets buckets = new Buckets(start, end);
+//
+//        // execute map reduce to unroll the batched raw data. The output of the map reduce
+//        // job is a map of timestamps to a list of raw values. Each timestamp corresponds
+//        // to a bucket.
+//        Map<Long, List<Double>> dataPoints =
+//            new MapReduceTask<MetricKey, Set<RawData>, Long, List<Double>>(rawAggregatesCache)
+//            .mappedWith(new DataPointsMapper(buckets))
+//            .reducedWith(new DataPointsReducer(buckets))
+//            .onKeys(keys.toArray(new MetricKey[keys.size()]))
+//            .execute();
+//
+//        for (Long timestamp : dataPoints.keySet()) {
+//            List<Double> values = dataPoints.get(timestamp);
+//            for (Double value : values) {
+//                buckets.insert(timestamp, value);
+//            }
+//        }
+//
+//        List<MeasurementDataNumericHighLowComposite> data = new ArrayList<MeasurementDataNumericHighLowComposite>();
+//        for (int i = 0; i < buckets.getNumDataPoints(); ++i) {
+//            Buckets.Bucket bucket = buckets.get(i);
+//            data.add(new MeasurementDataNumericHighLowComposite(bucket.getStartTime(), bucket.getAvg(),
+//                bucket.getMax(), bucket.getMin()));
+//        }
+//
+//        return data;
 
-        Buckets buckets = new Buckets(start, end);
+        DistributedExecutorService executorService = new DefaultExecutorService(rawAggregatesCache);
+        Future<List<MeasurementDataNumericHighLowComposite>> results = executorService.submit(
+            new GenerateDataPoints(start.getMillis(), end.getMillis()), keys.toArray(new MetricKey[keys.size()]));
 
-        // execute map reduce to unroll the batched raw data. The output of the map reduce
-        // job is a map of timestamps to a list of raw values. Each timestamp corresponds
-        // to a bucket.
-        Map<Long, List<Double>> dataPoints =
-            new MapReduceTask<MetricKey, Set<RawData>, Long, List<Double>>(rawAggregatesCache)
-            .mappedWith(new DataPointsMapper(buckets))
-            .reducedWith(new DataPointsReducer(buckets))
-            .onKeys(keys.toArray(new MetricKey[keys.size()]))
-            .execute();
-
-        for (Long timestamp : dataPoints.keySet()) {
-            List<Double> values = dataPoints.get(timestamp);
-            for (Double value : values) {
-                buckets.insert(timestamp, value);
+        while (!results.isDone()) {
+            try {
+                Thread.sleep(10L);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                return null;
             }
         }
 
-        List<MeasurementDataNumericHighLowComposite> data = new ArrayList<MeasurementDataNumericHighLowComposite>();
-        for (int i = 0; i < buckets.getNumDataPoints(); ++i) {
-            Buckets.Bucket bucket = buckets.get(i);
-            data.add(new MeasurementDataNumericHighLowComposite(bucket.getStartTime(), bucket.getAvg(),
-                bucket.getMax(), bucket.getMin()));
+        try {
+            return results.get();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return null;
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+            return null;
         }
-
-        return data;
     }
 
     @Override
@@ -195,6 +217,48 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
             return null;
         }
 
+    }
+
+    private class GenerateDataPoints implements Serializable,
+        DistributedCallable<MetricKey, Set<RawData>, List<MeasurementDataNumericHighLowComposite>> {
+
+        private static final long serialVersionUID = 1L;
+
+        private Buckets buckets;
+
+        private Set<MetricKey> keys;
+
+        public GenerateDataPoints(long startTime, long endTime) {
+            buckets = new Buckets(startTime, endTime);
+        }
+
+        @Override
+        public void setEnvironment(Cache<MetricKey, Set<RawData>> cache, Set<MetricKey> inputKeys) {
+            keys = inputKeys;
+        }
+
+        @Override
+        public List<MeasurementDataNumericHighLowComposite> call() throws Exception {
+            Cache<MetricKey, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+            for (MetricKey key : keys) {
+                Set<RawData> data = rawAggregatesCache.get(key);
+                if (data == null) {
+                    continue;
+                }
+                for (RawData datum : data) {
+                    buckets.insert(datum.getTimestamp(), datum.getValue());
+                }
+            }
+
+            List<MeasurementDataNumericHighLowComposite> data = new ArrayList<MeasurementDataNumericHighLowComposite>();
+            for (int i = 0; i < buckets.getNumDataPoints(); ++i) {
+                Buckets.Bucket bucket = buckets.get(i);
+                data.add(new MeasurementDataNumericHighLowComposite(bucket.getStartTime(), bucket.getAvg(),
+                    bucket.getMax(), bucket.getMin()));
+            }
+
+            return data;
+        }
     }
 
 }
