@@ -1,6 +1,7 @@
 package org.rhq.server.plugins.metrics.infinispan;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,6 +13,7 @@ import org.infinispan.Cache;
 import org.infinispan.distexec.DefaultExecutorService;
 import org.infinispan.distexec.DistributedCallable;
 import org.infinispan.distexec.DistributedExecutorService;
+import org.infinispan.distexec.mapreduce.MapReduceTask;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.joda.time.DateTime;
@@ -29,6 +31,8 @@ import org.rhq.core.domain.util.PageList;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginComponent;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginFacet;
+import org.rhq.server.plugins.metrics.infinispan.query.DataPointsMapper;
+import org.rhq.server.plugins.metrics.infinispan.query.DataPointsReducer;
 
 /**
  * @author John Sanda
@@ -96,22 +100,49 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     }
 
     @Override
-    public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject,
-        EntityContext entityContext, MeasurementSchedule measurementSchedule, long l, long l1) {
+    public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject, EntityContext entityContext,
+        MeasurementSchedule schedule, long beginTime, long endTime) {
 
-        List<MeasurementDataNumericHighLowComposite> result = Collections.emptyList();
+        Cache<MetricKey, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
 
-        // possible dummy code to get the plugin to do something
-        /*
-        Cache<String, Integer> c = new DefaultCacheManager().getCache();
-        Integer v = c.get("testKey");
-        List<MeasurementDataNumericHighLowComposite> result = new ArrayList<MeasurementDataNumericHighLowComposite>();
-        for (long i = 0, time = System.currentTimeMillis(); i < 60; ++i, time -= 60000L) {
-            result.add(new MeasurementDataNumericHighLowComposite(time, v, v, v));
+        // First, determine the keys on which to operate
+        Set<MetricKey> keys = new HashSet<MetricKey>();
+        DateTime start = new DateTime(beginTime).hourOfDay().roundFloorCopy();
+        DateTime end = new DateTime(endTime).hourOfDay().roundFloorCopy();
+        DateTime theTime = start;
+
+        while (theTime.isBefore(end.plusHours(1))) {
+            keys.add(new MetricKey(schedule.getId(), theTime.getMillis()));
+            theTime = theTime.plusHours(1);
         }
-        */
 
-        return result;
+        Buckets buckets = new Buckets(start, end);
+
+        // execute map reduce to unroll the batched raw data. The output of the map reduce
+        // job is a map of timestamps to a list of raw values. Each timestamp corresponds
+        // to a bucket.
+        Map<Long, List<Double>> dataPoints =
+            new MapReduceTask<MetricKey, Set<RawData>, Long, List<Double>>(rawAggregatesCache)
+            .mappedWith(new DataPointsMapper(buckets))
+            .reducedWith(new DataPointsReducer(buckets))
+            .onKeys(keys.toArray(new MetricKey[keys.size()]))
+            .execute();
+
+        for (Long timestamp : dataPoints.keySet()) {
+            List<Double> values = dataPoints.get(timestamp);
+            for (Double value : values) {
+                buckets.insert(timestamp, value);
+            }
+        }
+
+        List<MeasurementDataNumericHighLowComposite> data = new ArrayList<MeasurementDataNumericHighLowComposite>();
+        for (int i = 0; i < buckets.getNumDataPoints(); ++i) {
+            Buckets.Bucket bucket = buckets.get(i);
+            data.add(new MeasurementDataNumericHighLowComposite(bucket.getStartTime(), bucket.getAvg(),
+                bucket.getMax(), bucket.getMin()));
+        }
+
+        return data;
     }
 
     @Override

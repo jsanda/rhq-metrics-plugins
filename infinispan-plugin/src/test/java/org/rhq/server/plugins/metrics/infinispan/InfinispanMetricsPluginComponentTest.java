@@ -8,6 +8,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.infinispan.Cache;
@@ -19,7 +20,9 @@ import org.testng.annotations.Test;
 import org.rhq.core.domain.configuration.Configuration;
 import org.rhq.core.domain.measurement.DataType;
 import org.rhq.core.domain.measurement.MeasurementDataNumeric;
+import org.rhq.core.domain.measurement.MeasurementSchedule;
 import org.rhq.core.domain.measurement.MeasurementScheduleRequest;
+import org.rhq.core.domain.measurement.composite.MeasurementDataNumericHighLowComposite;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 
 /**
@@ -44,7 +47,7 @@ public class InfinispanMetricsPluginComponentTest {
         return new ServerPluginContext(null, null, null, config, null);
     }
 
-    @Test
+    @Test(enabled = false)
     public void insertRawData() throws Exception {
         int scheduleId = 123;
 
@@ -92,6 +95,52 @@ public class InfinispanMetricsPluginComponentTest {
         Set<RawData> actual = rawAggregates.get(new MetricKey(scheduleId, hour4.getMillis()));
 
         assertRawDataEquals(actual, expected, "Failed to find raw aggregates");
+    }
+
+    @Test
+    public void findRawDataComposites() {
+        int scheduleId = 123;
+        MeasurementSchedule schedule = new MeasurementSchedule();
+        schedule.setId(scheduleId);
+
+        DateTime hour0 = now().hourOfDay().roundFloorCopy().minusHours(now().hourOfDay().get());
+        DateTime beginTime = hour0.plusHours(4);
+        DateTime endTime = hour0.plusHours(8);
+
+        Buckets buckets = new Buckets(beginTime, endTime);
+
+        Set<MeasurementDataNumeric> data = new HashSet<MeasurementDataNumeric>();
+        data.add(new MeasurementDataNumeric(buckets.get(0).getStartTime() + 10, scheduleId, 1.1));
+        data.add(new MeasurementDataNumeric(buckets.get(0).getStartTime() + 20, scheduleId, 2.2));
+        data.add(new MeasurementDataNumeric(buckets.get(0).getStartTime() + 30, scheduleId, 3.3));
+        data.add(new MeasurementDataNumeric(buckets.get(59).getStartTime() + 10, scheduleId, 4.4));
+        data.add(new MeasurementDataNumeric(buckets.get(59).getStartTime() + 20, scheduleId, 5.5));
+        data.add(new MeasurementDataNumeric(buckets.get(59).getStartTime() + 30, scheduleId, 6.6));
+
+        // add some data outside the range
+        data.add(new MeasurementDataNumeric(buckets.get(0).getStartTime() - 100, scheduleId, 1.23));
+        data.add(new MeasurementDataNumeric(buckets.get(59).getStartTime() + buckets.getInterval() + 50, scheduleId,
+            4.56));
+
+        metricsServer.addNumericData(data);
+        List<MeasurementDataNumericHighLowComposite> actualData = metricsServer.findDataForContext(null, null,
+            schedule, beginTime.getMillis(), endTime.getMillis());
+
+        assertEquals(actualData.size(), buckets.getNumDataPoints(), "Expected to get back 60 data points.");
+
+        MeasurementDataNumericHighLowComposite expectedBucket0Data = new MeasurementDataNumericHighLowComposite(
+            buckets.get(0).getStartTime(), (1.1 + 2.2 + 3.3) / 3, 3.3, 1.1);
+        MeasurementDataNumericHighLowComposite expectedBucket59Data = new MeasurementDataNumericHighLowComposite(
+            buckets.get(59).getStartTime(), (4.4 + 5.5 + 6.6) / 3, 6.6, 4.4);
+        MeasurementDataNumericHighLowComposite expectedBucket29Data = new MeasurementDataNumericHighLowComposite(
+            buckets.get(29).getStartTime(), Double.NaN, Double.NaN, Double.NaN);
+
+        assertPropertiesMatch("The data for bucket 0 does not match the expected values.", expectedBucket0Data,
+            actualData.get(0));
+        assertPropertiesMatch("The data for bucket 59 does not match the expected values.", expectedBucket59Data,
+            actualData.get(59));
+        assertPropertiesMatch("The data for bucket 29 does not match the expected values.", expectedBucket29Data,
+            actualData.get(29));
     }
 
     private void assertRawDataEquals(Set<RawData> actual, Set<RawData> expected, String msg) {
