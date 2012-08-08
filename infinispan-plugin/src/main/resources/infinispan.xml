@@ -15,6 +15,17 @@
       <async/>
       <hash numOwners="1"/>
     </clustering>
+
+    <loaders>
+      <loader class="org.infinispan.loaders.jdbm.JdbmCacheStore"
+              fetchPersistentState="true"
+              ignoreModifications="false">
+        <async enabled="true"/>
+        <properties>
+          <property name="location" value="target/infinispan"/>
+        </properties>
+      </loader>
+    </loaders>
   </default>
 
 </infinispan>

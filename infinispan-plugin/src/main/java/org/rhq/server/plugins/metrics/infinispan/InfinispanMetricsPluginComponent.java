@@ -1,8 +1,11 @@
 package org.rhq.server.plugins.metrics.infinispan;
 
+import java.io.Serializable;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.infinispan.Cache;
@@ -66,12 +69,18 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         Cache<MetricKey, Double> cache = cacheManager.getCache(RAW_DATA_CACHE, true);
         DistributedExecutorService executorService = new DefaultExecutorService(cache);
 
+        Map<MetricKey, Double> rawData = new HashMap<MetricKey, Double>();
+
         for (MeasurementDataNumeric data : dataSet) {
             MetricKey key = new MetricKey(data.getScheduleId(), data.getTimestamp());
-            cache.put(key, data.getValue());
-            executorService.submit(new AggregateRawData(), key);
+            rawData.put(key, data.getValue());
+//            cache.put(key, data.getValue());
+            //executorService.submit(new AggregateRawData(), key);
         }
-
+        cache.putAllAsync(rawData);
+        Set<MetricKey> keys = rawData.keySet();
+        executorService.submit(new AggregateRawData(), keys.toArray(new MetricKey[keys.size()]));
+        //executorService.submitEverywhere(new AggregateRawData(), keys.toArray(new MetricKey[keys.size()]));
     }
 
     @Override
@@ -122,7 +131,8 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         return cacheManager;
     }
 
-    private class AggregateRawData implements DistributedCallable<MetricKey, Double, String> {
+    private class AggregateRawData implements DistributedCallable<MetricKey, Double, String>, Serializable {
+        private static final long serialVersionUID = 1L;
 
         private Cache<MetricKey, Double> rawDataCache;
 
@@ -148,7 +158,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
                 }
 
                 rawData.add(new RawData(key.getTimestamp(), rawDataCache.get(key)));
-                rawAggregatesCache.put(aggregatesKey    , rawData);
+                rawAggregatesCache.put(aggregatesKey, rawData);
             }
 
             return null;

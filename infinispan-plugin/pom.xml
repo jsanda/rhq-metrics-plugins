@@ -26,6 +26,18 @@
     </dependency>
 
     <dependency>
+      <groupId>org.infinispan</groupId>
+      <artifactId>infinispan-cachestore-jdbm</artifactId>
+      <version>5.2.0.ALPHA1</version>
+    </dependency>
+
+    <!--<dependency>-->
+      <!--<groupId>jdbm</groupId>-->
+      <!--<artifactId>jdbm</artifactId>-->
+      <!--<version>1.0</version>-->
+    <!--</dependency>-->
+
+    <dependency>
       <groupId>joda-time</groupId>
       <artifactId>joda-time</artifactId>
       <version>2.1</version>
