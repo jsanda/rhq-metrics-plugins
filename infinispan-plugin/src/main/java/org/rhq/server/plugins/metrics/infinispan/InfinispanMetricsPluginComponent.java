@@ -43,6 +43,8 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     public static final String RAW_BATCHES_CACHE = "RawBatches";
 
+    public static final String HOUR_DATA_BATCHES_CACHE = "HourDataBatches";
+
     public static final String HOUR0_DATA_INDEX_CACHE = "Hour0DataIndex";
     public static final String HOUR1_DATA_INDEX_CACHE = "Hour1DataIndex";
     public static final String HOUR2_DATA_INDEX_CACHE = "Hour2DataIndex";
@@ -140,7 +142,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject, EntityContext entityContext,
         MeasurementSchedule schedule, long beginTime, long endTime) {
 
-        Cache<MetricKey, Set<RawData>> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
+        Cache<MetricKey, Set<MetricData>> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
 
         // First, determine the keys on which to operate
         Set<MetricKey> keys = new HashSet<MetricKey>();
@@ -237,17 +239,17 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
         @Override
         public String call() throws Exception {
-            Cache<MetricKey, RawDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
+            Cache<MetricKey, MetricDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
             for (MetricKey key : keys) {
                 long theHour = new DateTime(key.getTimestamp()).hourOfDay().roundFloorCopy().getMillis();
 
                 MetricKey batchKey = new MetricKey(key.getScheduleId(), theHour);
-                RawDataBatch batch = rawBatchesCache.get(batchKey);
+                MetricDataBatch batch = rawBatchesCache.get(batchKey);
 
                 if (batch == null) {
-                    batch = new RawDataBatch();
+                    batch = new MetricDataBatch();
                 }
-                batch.addRawData(new RawData(key.getTimestamp(), rawDataCache.get(key)));
+                batch.addData(new MetricData(key.getTimestamp(), rawDataCache.get(key)));
                 rawBatchesCache.put(batchKey, batch);
             }
 
@@ -257,7 +259,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     }
 
     private class GenerateDataPoints implements Serializable,
-        DistributedCallable<MetricKey, RawDataBatch, List<MeasurementDataNumericHighLowComposite>> {
+        DistributedCallable<MetricKey, MetricDataBatch, List<MeasurementDataNumericHighLowComposite>> {
 
         private static final long serialVersionUID = 1L;
 
@@ -270,19 +272,19 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         }
 
         @Override
-        public void setEnvironment(Cache<MetricKey, RawDataBatch> cache, Set<MetricKey> inputKeys) {
+        public void setEnvironment(Cache<MetricKey, MetricDataBatch> cache, Set<MetricKey> inputKeys) {
             keys = inputKeys;
         }
 
         @Override
         public List<MeasurementDataNumericHighLowComposite> call() throws Exception {
-            Cache<MetricKey, RawDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
+            Cache<MetricKey, MetricDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
             for (MetricKey key : keys) {
-                RawDataBatch batch = rawBatchesCache.get(key);
+                MetricDataBatch batch = rawBatchesCache.get(key);
                 if (batch == null) {
                     continue;
                 }
-                for (RawData datum : batch.getRawData()) {
+                for (MetricData datum : batch.getData()) {
                     buckets.insert(datum.getTimestamp(), datum.getValue());
                 }
             }
@@ -296,6 +298,11 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
             return data;
         }
+    }
+
+    protected DateTime getCurrentHour() {
+        DateTime now = new DateTime();
+        return now.hourOfDay().roundFloorCopy();
     }
 
 }

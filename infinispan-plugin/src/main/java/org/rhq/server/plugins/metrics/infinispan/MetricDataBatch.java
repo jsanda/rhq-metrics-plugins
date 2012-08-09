@@ -8,16 +8,16 @@ import java.util.TreeSet;
 /**
  * @author John Sanda
  */
-public class RawDataBatch implements Serializable {
+public class MetricDataBatch implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    private Set<RawData> rawData = new TreeSet<RawData>(new Comparator<RawData>() {
+    private Set<MetricData> data = new TreeSet<MetricData>(new Comparator<MetricData>() {
         @Override
-        public int compare(RawData r1, RawData r2) {
-            if (r1.getTimestamp() < r2.getTimestamp()) {
+        public int compare(MetricData d1, MetricData d2) {
+            if (d1.getTimestamp() < d2.getTimestamp()) {
                 return -1;
-            } else if (r1.getTimestamp() > r2.getTimestamp()) {
+            } else if (d1.getTimestamp() > d2.getTimestamp()) {
                 return 1;
             } else {
                 return 0;
@@ -31,10 +31,10 @@ public class RawDataBatch implements Serializable {
 
     private double sum = 0;
 
-    public void addRawData(RawData data) {
-        rawData.add(data);
+    public void addData(MetricData data) {
+        this.data.add(data);
         sum += data.getValue();
-        if (rawData.size() == 1) {
+        if (this.data.size() == 1) {
             max = data.getValue();
             min = data.getValue();
             sum = data.getValue();
@@ -49,8 +49,8 @@ public class RawDataBatch implements Serializable {
         }
     }
 
-    public Set<RawData> getRawData() {
-        return rawData;
+    public Set<MetricData> getData() {
+        return data;
     }
 
     public double getMax() {
@@ -62,7 +62,7 @@ public class RawDataBatch implements Serializable {
     }
 
     public double getAvg() {
-        return sum / rawData.size();
+        return sum / data.size();
     }
 
 }
