@@ -21,6 +21,7 @@ import org.joda.time.DateTime;
 
 import org.rhq.core.domain.auth.Subject;
 import org.rhq.core.domain.common.EntityContext;
+import org.rhq.core.domain.configuration.Configuration;
 import org.rhq.core.domain.criteria.TraitMeasurementCriteria;
 import org.rhq.core.domain.measurement.MeasurementDataNumeric;
 import org.rhq.core.domain.measurement.MeasurementDataTrait;
@@ -46,13 +47,10 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     @Override
     public void initialize(ServerPluginContext serverPluginContext) throws Exception {
-        cacheManager = new DefaultCacheManager("infinispan.xml", true);
+        Configuration pluginConfig = serverPluginContext.getPluginConfiguration();
+        String cacheConfig = pluginConfig.getSimpleValue("cache.config.file");
 
-        // possible dummy code to get the plugin to do something
-        /*
-        Cache c = cacheManager.getCache();
-        c.put("TestKey", new Integer(1));
-        */
+        cacheManager = new DefaultCacheManager(cacheConfig, true);
     }
 
     @Override

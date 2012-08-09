@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.rhq.core.domain.auth.Subject;
 import org.rhq.core.domain.configuration.Configuration;
+import org.rhq.core.domain.configuration.PropertySimple;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 import org.rhq.enterprise.server.plugin.pc.metrics.AggregateTestData;
 import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginTestDelegate;
@@ -15,6 +16,9 @@ public class InfinispanMetricsTestDelegate implements MetricsServerPluginTestDel
 
     @Override
     public ServerPluginContext createTestContext() {
+        Configuration config = new Configuration();
+        config.put(new PropertySimple("cache.config.file", "infinispan.xml"));
+
         return new ServerPluginContext(null, null, null, new Configuration(), null);
     }
 
@@ -45,12 +49,11 @@ public class InfinispanMetricsTestDelegate implements MetricsServerPluginTestDel
 
     @Override
     public List<AggregateTestData> find1HourData(Subject subject, int i, long l, long l1) {
-        return null; //To change body of implemented methods use File | Settings | File Templates.
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
     public List<AggregateTestData> find6HourData(Subject subject, int i, long l, long l1) {
-        return null; //To change body of implemented methods use File | Settings | File Templates.
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
-
 }

@@ -18,6 +18,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import org.rhq.core.domain.configuration.Configuration;
+import org.rhq.core.domain.configuration.PropertySimple;
 import org.rhq.core.domain.measurement.DataType;
 import org.rhq.core.domain.measurement.MeasurementDataNumeric;
 import org.rhq.core.domain.measurement.MeasurementSchedule;
@@ -44,6 +45,8 @@ public class InfinispanMetricsPluginComponentTest {
 
     private ServerPluginContext createTestContext() {
         Configuration config = new Configuration();
+        config.put(new PropertySimple("cache.config.file", "infinispan-test.xml"));
+
         return new ServerPluginContext(null, null, null, config, null);
     }
 
