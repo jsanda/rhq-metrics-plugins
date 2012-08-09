@@ -43,9 +43,23 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     public static final String RAW_BATCHES_CACHE = "RawBatches";
 
-    public static final String HOUR_DATA_INDEX_CACHE = "HourDataIndex";
+    public static final String HOUR0_DATA_INDEX_CACHE = "Hour0DataIndex";
+    public static final String HOUR1_DATA_INDEX_CACHE = "Hour1DataIndex";
+    public static final String HOUR2_DATA_INDEX_CACHE = "Hour2DataIndex";
+    public static final String HOUR3_DATA_INDEX_CACHE = "Hour3DataIndex";
+    public static final String HOUR4_DATA_INDEX_CACHE = "Hour4DataIndex";
+    public static final String HOUR5_DATA_INDEX_CACHE = "Hour5DataIndex";
+    public static final String HOUR6_DATA_INDEX_CACHE = "Hour6DataIndex";
+    public static final String HOUR7_DATA_INDEX_CACHE = "Hour7DataIndex";
+    public static final String HOUR8_DATA_INDEX_CACHE = "Hour8DataIndex";
+    public static final String HOUR9_DATA_INDEX_CACHE = "Hour9DataIndex";
+    public static final String HOUR10_DATA_INDEX_CACHE = "Hour10DataIndex";
+    public static final String HOUR11_DATA_INDEX_CACHE = "Hour11DataIndex";
+    public static final String HOUR12_DATA_INDEX_CACHE = "Hour12DataIndex";
 
     private EmbeddedCacheManager cacheManager;
+
+    private Map<Integer, String> hourlyIndexCaches = new HashMap<Integer, String>();
 
     @Override
     public void initialize(ServerPluginContext serverPluginContext) throws Exception {
@@ -53,6 +67,20 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         String cacheConfig = pluginConfig.getSimpleValue("cache.config.file");
 
         cacheManager = new DefaultCacheManager(cacheConfig, true);
+
+        hourlyIndexCaches.put(0, HOUR0_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(1, HOUR1_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(2, HOUR2_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(3, HOUR3_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(4, HOUR4_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(5, HOUR5_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(6, HOUR6_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(7, HOUR7_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(8, HOUR8_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(9, HOUR9_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(10, HOUR10_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(11, HOUR11_DATA_INDEX_CACHE);
+        hourlyIndexCaches.put(12, HOUR12_DATA_INDEX_CACHE);
     }
 
     @Override
@@ -70,25 +98,30 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     @Override
     public void addNumericData(Set<MeasurementDataNumeric> dataSet) {
         Cache<MetricKey, Double> cache = cacheManager.getCache(RAW_DATA_CACHE, true);
-        Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(HOUR_DATA_INDEX_CACHE, true);
         DistributedExecutorService executorService = new DefaultExecutorService(cache);
 
         Map<MetricKey, Double> rawData = new HashMap<MetricKey, Double>();
-        Map<MetricKey, Boolean> indexUpdates = new HashMap<MetricKey, Boolean>();
+        Set<MetricKey> indexUpdates = new HashSet<MetricKey>();
 
         for (MeasurementDataNumeric data : dataSet) {
             MetricKey key = new MetricKey(data.getScheduleId(), data.getTimestamp());
             rawData.put(key, data.getValue());
-            indexUpdates.put(new MetricKey(data.getScheduleId(),
-                new DateTime(data.getTimestamp()).hourOfDay().roundFloorCopy().getMillis()), true);
+            indexUpdates.add(new MetricKey(data.getScheduleId(),
+                new DateTime(data.getTimestamp()).hourOfDay().roundFloorCopy().getMillis()));
 //            cache.put(key, data.getValue());
             //executorService.submit(new AggregateRawData(), key);
         }
         cache.putAllAsync(rawData);
-        indexCache.putAllAsync(indexUpdates);
         Set<MetricKey> keys = rawData.keySet();
         executorService.submit(new CreateRawDataBatches(), keys.toArray(new MetricKey[keys.size()]));
         //executorService.submitEverywhere(new AggregateRawData(), keys.toArray(new MetricKey[keys.size()]));
+
+        for (MetricKey key : indexUpdates) {
+            int hour = new DateTime(key.getTimestamp()).hourOfDay().get();
+            String index = hourlyIndexCaches.get(hour);
+            Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(index, true);
+            indexCache.putAsync(key, true);
+        }
     }
 
     @Override

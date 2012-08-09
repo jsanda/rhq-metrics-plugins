@@ -1,7 +1,7 @@
 package org.rhq.server.plugins.metrics.infinispan;
 
 import static org.joda.time.DateTime.now;
-import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.HOUR_DATA_INDEX_CACHE;
+import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.HOUR4_DATA_INDEX_CACHE;
 import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.RAW_BATCHES_CACHE;
 import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.RAW_DATA_CACHE;
 import static org.rhq.test.AssertUtils.assertPropertiesMatch;
@@ -100,9 +100,9 @@ public class InfinispanMetricsPluginComponentTest {
         assertRawDataBatchEquals(actual, expected, "Failed to find raw batch.");
 
         // verify that the hour data index is updated
-        Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(HOUR_DATA_INDEX_CACHE);
+        Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(HOUR4_DATA_INDEX_CACHE);
         MetricKey expectedKey = new MetricKey(scheduleId, hour4.getMillis());
-        assertNotNull(indexCache.get(expectedKey), "Expected to find " + expectedKey + " in " + HOUR_DATA_INDEX_CACHE);
+        assertNotNull(indexCache.get(expectedKey), "Expected to find " + expectedKey + " in " + HOUR4_DATA_INDEX_CACHE);
     }
 
     @Test
