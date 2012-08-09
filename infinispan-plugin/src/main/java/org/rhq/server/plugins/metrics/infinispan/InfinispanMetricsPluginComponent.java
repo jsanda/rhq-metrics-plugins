@@ -41,7 +41,9 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     public static final String RAW_DATA_CACHE = "RawData";
 
-    public static final String RAW_AGGREGATES_CACHE = "RawAggregates";
+    public static final String RAW_BATCHES_CACHE = "RawBatches";
+
+    public static final String HOUR_DATA_INDEX_CACHE = "HourDataIndex";
 
     private EmbeddedCacheManager cacheManager;
 
@@ -68,19 +70,24 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     @Override
     public void addNumericData(Set<MeasurementDataNumeric> dataSet) {
         Cache<MetricKey, Double> cache = cacheManager.getCache(RAW_DATA_CACHE, true);
+        Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(HOUR_DATA_INDEX_CACHE, true);
         DistributedExecutorService executorService = new DefaultExecutorService(cache);
 
         Map<MetricKey, Double> rawData = new HashMap<MetricKey, Double>();
+        Map<MetricKey, Boolean> indexUpdates = new HashMap<MetricKey, Boolean>();
 
         for (MeasurementDataNumeric data : dataSet) {
             MetricKey key = new MetricKey(data.getScheduleId(), data.getTimestamp());
             rawData.put(key, data.getValue());
+            indexUpdates.put(new MetricKey(data.getScheduleId(),
+                new DateTime(data.getTimestamp()).hourOfDay().roundFloorCopy().getMillis()), true);
 //            cache.put(key, data.getValue());
             //executorService.submit(new AggregateRawData(), key);
         }
         cache.putAllAsync(rawData);
+        indexCache.putAllAsync(indexUpdates);
         Set<MetricKey> keys = rawData.keySet();
-        executorService.submit(new AggregateRawData(), keys.toArray(new MetricKey[keys.size()]));
+        executorService.submit(new CreateRawDataBatches(), keys.toArray(new MetricKey[keys.size()]));
         //executorService.submitEverywhere(new AggregateRawData(), keys.toArray(new MetricKey[keys.size()]));
     }
 
@@ -100,7 +107,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject, EntityContext entityContext,
         MeasurementSchedule schedule, long beginTime, long endTime) {
 
-        Cache<MetricKey, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+        Cache<MetricKey, Set<RawData>> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
 
         // First, determine the keys on which to operate
         Set<MetricKey> keys = new HashSet<MetricKey>();
@@ -119,7 +126,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 //        // job is a map of timestamps to a list of raw values. Each timestamp corresponds
 //        // to a bucket.
 //        Map<Long, List<Double>> dataPoints =
-//            new MapReduceTask<MetricKey, Set<RawData>, Long, List<Double>>(rawAggregatesCache)
+//            new MapReduceTask<MetricKey, RawDataBach, Long, List<Double>>(rawBatchesCache)
 //            .mappedWith(new DataPointsMapper(buckets))
 //            .reducedWith(new DataPointsReducer(buckets))
 //            .onKeys(keys.toArray(new MetricKey[keys.size()]))
@@ -141,7 +148,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 //
 //        return data;
 
-        DistributedExecutorService executorService = new DefaultExecutorService(rawAggregatesCache);
+        DistributedExecutorService executorService = new DefaultExecutorService(rawBatchesCache);
         Future<List<MeasurementDataNumericHighLowComposite>> results = executorService.submit(
             new GenerateDataPoints(start.getMillis(), end.getMillis()), keys.toArray(new MetricKey[keys.size()]));
 
@@ -182,7 +189,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         return cacheManager;
     }
 
-    private class AggregateRawData implements DistributedCallable<MetricKey, Double, String>, Serializable {
+    private class CreateRawDataBatches implements DistributedCallable<MetricKey, Double, String>, Serializable {
         private static final long serialVersionUID = 1L;
 
         private Cache<MetricKey, Double> rawDataCache;
@@ -197,19 +204,18 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
         @Override
         public String call() throws Exception {
-            Cache<MetricKey, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+            Cache<MetricKey, RawDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
             for (MetricKey key : keys) {
                 long theHour = new DateTime(key.getTimestamp()).hourOfDay().roundFloorCopy().getMillis();
 
-                MetricKey aggregatesKey = new MetricKey(key.getScheduleId(), theHour);
-                Set<RawData> rawData = rawAggregatesCache.get(aggregatesKey);
+                MetricKey batchKey = new MetricKey(key.getScheduleId(), theHour);
+                RawDataBatch batch = rawBatchesCache.get(batchKey);
 
-                if (rawData == null) {
-                    rawData = new HashSet<RawData>();
+                if (batch == null) {
+                    batch = new RawDataBatch();
                 }
-
-                rawData.add(new RawData(key.getTimestamp(), rawDataCache.get(key)));
-                rawAggregatesCache.put(aggregatesKey, rawData);
+                batch.addRawData(new RawData(key.getTimestamp(), rawDataCache.get(key)));
+                rawBatchesCache.put(batchKey, batch);
             }
 
             return null;
@@ -218,7 +224,7 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     }
 
     private class GenerateDataPoints implements Serializable,
-        DistributedCallable<MetricKey, Set<RawData>, List<MeasurementDataNumericHighLowComposite>> {
+        DistributedCallable<MetricKey, RawDataBatch, List<MeasurementDataNumericHighLowComposite>> {
 
         private static final long serialVersionUID = 1L;
 
@@ -231,19 +237,19 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
         }
 
         @Override
-        public void setEnvironment(Cache<MetricKey, Set<RawData>> cache, Set<MetricKey> inputKeys) {
+        public void setEnvironment(Cache<MetricKey, RawDataBatch> cache, Set<MetricKey> inputKeys) {
             keys = inputKeys;
         }
 
         @Override
         public List<MeasurementDataNumericHighLowComposite> call() throws Exception {
-            Cache<MetricKey, Set<RawData>> rawAggregatesCache = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+            Cache<MetricKey, RawDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
             for (MetricKey key : keys) {
-                Set<RawData> data = rawAggregatesCache.get(key);
-                if (data == null) {
+                RawDataBatch batch = rawBatchesCache.get(key);
+                if (batch == null) {
                     continue;
                 }
-                for (RawData datum : data) {
+                for (RawData datum : batch.getRawData()) {
                     buckets.insert(datum.getTimestamp(), datum.getValue());
                 }
             }

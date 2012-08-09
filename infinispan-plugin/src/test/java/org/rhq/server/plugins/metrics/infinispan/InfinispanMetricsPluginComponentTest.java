@@ -1,7 +1,8 @@
 package org.rhq.server.plugins.metrics.infinispan;
 
 import static org.joda.time.DateTime.now;
-import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.RAW_AGGREGATES_CACHE;
+import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.HOUR_DATA_INDEX_CACHE;
+import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.RAW_BATCHES_CACHE;
 import static org.rhq.server.plugins.metrics.infinispan.InfinispanMetricsPluginComponent.RAW_DATA_CACHE;
 import static org.rhq.test.AssertUtils.assertPropertiesMatch;
 import static org.testng.Assert.assertEquals;
@@ -50,7 +51,7 @@ public class InfinispanMetricsPluginComponentTest {
         return new ServerPluginContext(null, null, null, config, null);
     }
 
-    @Test(enabled = false)
+    @Test
     public void insertRawData() throws Exception {
         int scheduleId = 123;
 
@@ -80,24 +81,28 @@ public class InfinispanMetricsPluginComponentTest {
         Cache<MetricKey, Double> rawDataCache = cacheManager.getCache(RAW_DATA_CACHE);
 
         assertEquals(rawDataCache.get(new MetricKey(scheduleId, threeMinutesAgo.getMillis())), 3.2,
-            "Failed to store raw data");
+            "Failed to store raw data.");
         assertEquals(rawDataCache.get(new MetricKey(scheduleId, twoMinutesAgo.getMillis())), 3.9,
-            "Failed to store raw data");
+            "Failed to store raw data.");
         assertEquals(rawDataCache.get(new MetricKey(scheduleId, oneMinuteAgo.getMillis())), 2.6,
-            "Failed to store raw data");
+            "Failed to store raw data.");
 
         // verify that raw aggregates upserted (i.e., inserted or updated)
-        Cache<MetricKey, Set<RawData>> rawAggregates = cacheManager.getCache(RAW_AGGREGATES_CACHE);
+        Cache<MetricKey, RawDataBatch> rawBatches = cacheManager.getCache(RAW_BATCHES_CACHE);
 
-        Set<RawData> expected = asSet(
-            new RawData(threeMinutesAgo.getMillis(), 3.2),
-            new RawData(twoMinutesAgo.getMillis(), 3.9),
-            new RawData(oneMinuteAgo.getMillis(), 2.6)
-        );
+        RawDataBatch expected = new RawDataBatch();
+        expected.addRawData(new RawData(threeMinutesAgo.getMillis(), 3.2));
+        expected.addRawData(new RawData(twoMinutesAgo.getMillis(), 3.9));
+        expected.addRawData(new RawData(oneMinuteAgo.getMillis(), 2.6));
 
-        Set<RawData> actual = rawAggregates.get(new MetricKey(scheduleId, hour4.getMillis()));
+        RawDataBatch actual = rawBatches.get(new MetricKey(scheduleId, hour4.getMillis()));
 
-        assertRawDataEquals(actual, expected, "Failed to find raw aggregates");
+        assertRawDataBatchEquals(actual, expected, "Failed to find raw batch.");
+
+        // verify that the hour data index is updated
+        Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(HOUR_DATA_INDEX_CACHE);
+        MetricKey expectedKey = new MetricKey(scheduleId, hour4.getMillis());
+        assertNotNull(indexCache.get(expectedKey), "Expected to find " + expectedKey + " in " + HOUR_DATA_INDEX_CACHE);
     }
 
     @Test
@@ -146,16 +151,19 @@ public class InfinispanMetricsPluginComponentTest {
             actualData.get(29));
     }
 
-    private void assertRawDataEquals(Set<RawData> actual, Set<RawData> expected, String msg) {
+    private void assertRawDataBatchEquals(RawDataBatch actual, RawDataBatch expected, String msg) {
         assertNotNull(actual, msg);
-        assertEquals(actual.size(), expected.size(), msg + " -- " + "The number of raw data aggregates do not match");
+        assertEquals(actual.getRawData().size(), expected.getRawData().size(), msg +
+            " -- The number of raw data in the batches do not match.");
 
-        RawData[] actualRaws = actual.toArray(new RawData[actual.size()]);
-        RawData[] expectedRaws = actual.toArray(new RawData[actual.size()]);
+        RawData[] actualRaws = actual.getRawData().toArray(new RawData[actual.getRawData().size()]);
+        RawData[] expectedRaws = expected.getRawData().toArray(new RawData[expected.getRawData().size()]);
 
         for (int i = 0; i < actualRaws.length; ++i) {
             assertPropertiesMatch(expectedRaws[i], actualRaws[i], msg);
         }
+
+        assertPropertiesMatch("Computed hourly aggregate values do not match.", actual, expected, "rawData");
     }
 
     private <T> Set<T> asSet(T... objs) {
