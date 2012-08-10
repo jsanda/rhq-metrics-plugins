@@ -15,9 +15,11 @@ import org.infinispan.Cache;
 import org.infinispan.distexec.DefaultExecutorService;
 import org.infinispan.distexec.DistributedCallable;
 import org.infinispan.distexec.DistributedExecutorService;
+import org.infinispan.distexec.mapreduce.MapReduceTask;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 import org.joda.time.DateTime;
+import org.joda.time.Hours;
 
 import org.rhq.core.domain.auth.Subject;
 import org.rhq.core.domain.common.EntityContext;
@@ -33,6 +35,8 @@ import org.rhq.core.domain.util.PageList;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginComponent;
 import org.rhq.enterprise.server.plugin.pc.ServerPluginContext;
 import org.rhq.enterprise.server.plugin.pc.metrics.MetricsServerPluginFacet;
+import org.rhq.server.plugins.metrics.infinispan.query.GetMetricKeysMapper;
+import org.rhq.server.plugins.metrics.infinispan.query.GetMetricKeysReducer;
 
 /**
  * @author John Sanda
@@ -62,6 +66,8 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
     private EmbeddedCacheManager cacheManager;
 
     private Map<Integer, String> hourlyIndexCaches = new HashMap<Integer, String>();
+
+    private DateTimeService dateTimeService = new DateTimeService();
 
     @Override
     public void initialize(ServerPluginContext serverPluginContext) throws Exception {
@@ -136,13 +142,32 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
 
     @Override
     public void calculateAggregates() {
+        DateTime theHour = getCurrentHour().minusHours(1);
+        String index = hourlyIndexCaches.get(theHour.hourOfDay().get());
+        Cache<MetricKey, Boolean> indexCache = cacheManager.getCache(index, true);
+
+        Map<Long, List<MetricKey>> keys =
+            new MapReduceTask<MetricKey, Boolean, Long, List<MetricKey>>(indexCache)
+            .mappedWith(new GetMetricKeysMapper(theHour.getMillis()))
+            .reducedWith(new GetMetricKeysReducer())
+            .execute();
+
+        Cache<MetricKey, MetricDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
+        DistributedExecutorService executorService = new DefaultExecutorService(rawBatchesCache);
+
+        for (Long timestamp : keys.keySet()) {
+            List<MetricKey> theKeys = keys.get(timestamp);
+            DateTime timeSlice = dateTimeService.getTimeSlice(new DateTime(timestamp), Hours.SIX.toStandardMinutes());
+            executorService.submit(new UpdateMetricDataBatch(timeSlice.getMillis()), theKeys.toArray(
+                new MetricKey[theKeys.size()]));
+        }
     }
 
     @Override
     public List<MeasurementDataNumericHighLowComposite> findDataForContext(Subject subject, EntityContext entityContext,
         MeasurementSchedule schedule, long beginTime, long endTime) {
 
-        Cache<MetricKey, Set<MetricData>> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
+        Cache<MetricKey, MetricDataBatch> rawBatchesCache = cacheManager.getCache(RAW_BATCHES_CACHE);
 
         // First, determine the keys on which to operate
         Set<MetricKey> keys = new HashSet<MetricKey>();
@@ -256,6 +281,44 @@ public class InfinispanMetricsPluginComponent implements MetricsServerPluginFace
             return null;
         }
 
+    }
+
+    private class UpdateMetricDataBatch implements DistributedCallable<MetricKey, MetricDataBatch, MetricKey>,
+        Serializable {
+        private static final long serialVersionUID = 1L;
+
+        private Map<MetricKey, MetricDataBatch> entries = new HashMap<MetricKey, MetricDataBatch>();
+
+        private long timestamp;
+
+        public UpdateMetricDataBatch(long timestamp) {
+            this.timestamp = timestamp;
+        }
+
+
+        @Override
+        public void setEnvironment(Cache<MetricKey, MetricDataBatch> cache, Set<MetricKey> inputKeys) {
+            for (MetricKey key : inputKeys) {
+                entries.put(key, cache.get(key));
+            }
+        }
+
+        @Override
+        public MetricKey call() throws Exception {
+            Cache<MetricKey, MetricDataBatch> cache = cacheManager.getCache(HOUR_DATA_BATCHES_CACHE, true);
+            for (MetricKey key : entries.keySet()) {
+                MetricKey batchKey = new MetricKey(key.getScheduleId(), timestamp);
+                MetricDataBatch batch = cache.get(batchKey);
+
+                if (batch == null) {
+                    batch = new MetricDataBatch();
+                }
+                MetricDataBatch aggregates = entries.get(key);
+                batch.addData(new MetricData(timestamp, aggregates.getAvg(), aggregates.getMin(), aggregates.getMax()));
+                cache.put(batchKey, batch);
+            }
+            return null;
+        }
     }
 
     private class GenerateDataPoints implements Serializable,

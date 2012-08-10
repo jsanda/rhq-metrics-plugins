@@ -25,11 +25,11 @@ public class MetricDataBatch implements Serializable {
         }
     });
 
-    private double max;
+    private Double max;
 
-    private double min;
+    private Double min;
 
-    private double sum = 0;
+    private Double sum = 0.0;
 
     public void addData(MetricData data) {
         this.data.add(data);

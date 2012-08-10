@@ -87,9 +87,9 @@ public class InfinispanMetricsPluginComponentTest {
             enabled, dataType);
 
         Set<MeasurementDataNumeric> data = new HashSet<MeasurementDataNumeric>();
-        data.add(new MeasurementDataNumeric(threeMinutesAgo.getMillis(), request, 3.2));
-        data.add(new MeasurementDataNumeric(twoMinutesAgo.getMillis(), request, 3.9));
-        data.add(new MeasurementDataNumeric(oneMinuteAgo.getMillis(), request, 2.6));
+        data.add(new MeasurementDataNumeric(threeMinutesAgo.getMillis(), request, 3.0));
+        data.add(new MeasurementDataNumeric(twoMinutesAgo.getMillis(), request, 3.5));
+        data.add(new MeasurementDataNumeric(oneMinuteAgo.getMillis(), request, 2.5));
 
         metricsServer.addNumericData(data);
 
@@ -97,20 +97,20 @@ public class InfinispanMetricsPluginComponentTest {
         EmbeddedCacheManager cacheManager = metricsServer.getCacheManager();
         Cache<MetricKey, Double> rawDataCache = cacheManager.getCache(RAW_DATA_CACHE);
 
-        assertEquals(rawDataCache.get(new MetricKey(scheduleId, threeMinutesAgo.getMillis())), 3.2,
+        assertEquals(rawDataCache.get(new MetricKey(scheduleId, threeMinutesAgo.getMillis())), 3.0,
             "Failed to store raw data.");
-        assertEquals(rawDataCache.get(new MetricKey(scheduleId, twoMinutesAgo.getMillis())), 3.9,
+        assertEquals(rawDataCache.get(new MetricKey(scheduleId, twoMinutesAgo.getMillis())), 3.5,
             "Failed to store raw data.");
-        assertEquals(rawDataCache.get(new MetricKey(scheduleId, oneMinuteAgo.getMillis())), 2.6,
+        assertEquals(rawDataCache.get(new MetricKey(scheduleId, oneMinuteAgo.getMillis())), 2.5,
             "Failed to store raw data.");
 
         // verify that raw aggregates upserted (i.e., inserted or updated)
         Cache<MetricKey, MetricDataBatch> rawBatches = cacheManager.getCache(RAW_BATCHES_CACHE);
 
         MetricDataBatch expected = new MetricDataBatch();
-        expected.addData(new MetricData(threeMinutesAgo.getMillis(), 3.2));
-        expected.addData(new MetricData(twoMinutesAgo.getMillis(), 3.9));
-        expected.addData(new MetricData(oneMinuteAgo.getMillis(), 2.6));
+        expected.addData(new MetricData(threeMinutesAgo.getMillis(), 3.0));
+        expected.addData(new MetricData(twoMinutesAgo.getMillis(), 3.5));
+        expected.addData(new MetricData(oneMinuteAgo.getMillis(), 2.5));
 
         MetricDataBatch actual = rawBatches.get(new MetricKey(scheduleId, hour4.getMillis()));
 
@@ -173,6 +173,7 @@ public class InfinispanMetricsPluginComponentTest {
         int scheduleId = 123;
 
         DateTime hour0 = now().hourOfDay().roundFloorCopy().minusHours(now().hourOfDay().get());
+        DateTime hour6 = hour0.plusHours(6);
         DateTime hour9 = hour0.plusHours(9);
         DateTime hour8 = hour9.minusHours(1);
 
@@ -180,9 +181,9 @@ public class InfinispanMetricsPluginComponentTest {
         DateTime secondMetricTime = hour8.plusMinutes(10);
         DateTime thirdMetricTime = hour8.plusMinutes(15);
 
-        double firstValue = 1.1;
-        double secondValue = 2.2;
-        double thirdValue = 3.3;
+        Double firstValue = 1.0;
+        Double secondValue = 2.0;
+        Double thirdValue = 3.0;
 
         // insert raw data to be aggregated
         Set<MeasurementDataNumeric> data = new HashSet<MeasurementDataNumeric>();
@@ -196,13 +197,13 @@ public class InfinispanMetricsPluginComponentTest {
 
         // verify that the hourly data batches are generated.
         MetricDataBatch expected = new MetricDataBatch();
-        expected.addData(new MetricData(hour8.getMillis(), (firstValue + secondValue + thirdValue) / 3, firstValue,
+        expected.addData(new MetricData(hour6.getMillis(), (firstValue + secondValue + thirdValue) / 3, firstValue,
             thirdValue));
 
         EmbeddedCacheManager cacheManager = metricsServer.getCacheManager();
         Cache<MetricKey, MetricDataBatch> cache = cacheManager.getCache(HOUR_DATA_BATCHES_CACHE);
 
-        MetricDataBatch actual = cache.get(new MetricKey(scheduleId, hour8.getMillis()));
+        MetricDataBatch actual = cache.get(new MetricKey(scheduleId, hour6.getMillis()));
 
         assertMetricDataBatchEquals(actual, expected,
             "Failed to generate metric data batch for compressed hourly data.");
