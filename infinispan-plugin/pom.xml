@@ -15,7 +15,7 @@
   <name>Infinispan Metrics Server Plugin</name>
 
   <properties>
-    <infinispan.version>5.2.0.ALPHA2</infinispan.version>
+    <infinispan.version>11.0.6.Final</infinispan.version>
   </properties>
 
   <dependencies>
